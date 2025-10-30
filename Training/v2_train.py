@@ -8,7 +8,7 @@ def main():
     device_num = 0;
 
     # Load YOLO11n model (nano, fastest and smallest)
-    model = YOLO("yolo11n.pt")
+    model = YOLO("/home/yasen/Training/runs/detect/train/weights/best.pt")
 
     print("="*60)
     print("Starting YOLO11n Training")
@@ -26,11 +26,13 @@ def main():
         hsv_h=0.015,      # HSV-Hue augmentation (reduce if colors matter)
         hsv_s=0.7,        # HSV-Saturation
         hsv_v=0.4,        # HSV-Value
-        degrees=0.0,      # Rotation (set to 0 if orientation matters)
-        translate=0.1,    # Translation
+        degrees=10.0,      # Rotation (set to 0 if orientation matters)
+        shear=10.0,
+        translate=0.5,    # Translation
         scale=0.5,        # Scale variation
         fliplr=0.5,       # Horizontal flip probability
         mosaic=1.0,       # Mosaic augmentation
+        close_mosaic=10,
         
         # Optimization
         optimizer='auto',  # or 'SGD', 'Adam', 'AdamW'
@@ -45,7 +47,7 @@ def main():
         
         # Project organization
         project='runs/detect',
-        name='train',
+        name='train3',
         exist_ok=True
     )
 
@@ -85,36 +87,6 @@ def main():
     print(f"  mAP50-95: {val_results.box.map:.3f}")
     print(f"  Precision: {val_results.box.mp:.3f}")
     print(f"  Recall: {val_results.box.mr:.3f}")
-    
-    # Export to TensorRT and ONNX with NMS enabled
-    print("\n" + "="*60)
-    print("Exporting Model with NMS")
-    print("="*60)
-    
-    # Export 1: ONNX with NMS
-    print("\n1. Exporting to ONNX with NMS...")
-    try:
-        onnx_path = model.export(
-            format="onnx",
-            simplify=True,
-            dynamic=False,
-            imgsz=640,
-            nms=True,          # CRITICAL: Enable NMS in the exported model
-            device=device_num,
-            path="/mnt/c/Users/Yasen/Training/gamepieceYoloV2.onnx"
-        )
-        print(f"   ✓ ONNX with NMS saved: {onnx_path}")
-    except Exception as e:
-        onnx_path = model.export(
-                format="onnx",
-                simplify=True,
-                dynamic=False,
-                imgsz=640,
-                nms=True,          # CRITICAL: Enable NMS in the exported model
-                device=device_num,
-            )
-        print(f"   ✗ ONNX export failed: {e}")
-        onnx_path = None
     
     print("\n" + "="*60)
     print("NMS Configuration Applied Successfully!")
