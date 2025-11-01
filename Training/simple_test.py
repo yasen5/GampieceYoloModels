@@ -1,10 +1,10 @@
 from ultralytics import YOLO
 
 # Load model
-model = YOLO("/home/yasen/Training/runs/detect/train/weights/best.onnx")
+model = YOLO("/home/yasen/Training/runs/detect/train3/weights/best.pt")
 
 # Run validation - it will automatically find your test set if you have a data.yaml
-metrics = model.val(data="/mnt/c/Users/Yasen/Documents/gamepiece-data/data.yaml", split="test")
+metrics = model.val(data="/mnt/c/Users/Yasen/Documents/more-gamepiece-data/data.yaml", split="test")
 
 # Print metrics
 print(f"mAP50: {metrics.box.map50}")

@@ -4,7 +4,7 @@ import os
 
 def main():
     # Path to your dataset.yaml
-    data_yaml = "/mnt/c/Users/Yasen/Documents/gamepiece-data/data.yaml"
+    data_yaml = "/mnt/c/Users/Yasen/Documents/more-gamepiece-data/data.yaml"
     device_num = 0;
 
     # Load YOLO11n model (nano, fastest and smallest)
@@ -17,7 +17,7 @@ def main():
     # Train the model
     results = model.train(
         data=data_yaml,
-        epochs=50,
+        epochs=100,
         imgsz=640,
         batch=16,
         device=device_num,
