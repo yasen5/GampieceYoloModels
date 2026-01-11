@@ -6,7 +6,7 @@ from glob import glob
 from tqdm import tqdm
 
 # Configuration
-MODEL_PATH = "/home/yasen/Training/runs/detect/train/weights/best.onnx"
+MODEL_PATH = "/home/yasen/Training/runs/detect/train3/weights/best.onnx"
 DATASET_ROOT = "/mnt/c/Users/Yasen/Documents/gamepiece-data"
 SPLIT = "test"
 IMG_SIZE = 640
@@ -19,7 +19,6 @@ LABEL_DIR = os.path.join(DATASET_ROOT, SPLIT, "labels")
 
 def letterbox(img, new_shape=640):
     """Resize and pad image to square."""
-    print("Img shape:", img.shape)
     h, w = img.shape[:2]
     r = min(new_shape / h, new_shape / w)
     new_w, new_h = int(round(w * r)), int(round(h * r))
@@ -29,7 +28,6 @@ def letterbox(img, new_shape=640):
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
     img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(114, 114, 114))
-    print("New img shape:", img.shape)
     return img, r, (dw, dh)
 
 
@@ -84,14 +82,6 @@ def postprocess(output, ratio, padding, orig_shape, conf_thresh, iou_thresh=0.5)
 
     if output.shape[0] == 0 or output.shape[1] != 6:
         return []
-
-    count = 0
-    for thing in output:
-        print(thing)
-        count+=1
-        if count >= 50:
-            break;
-    exit(0)
 
     for pred in output:
         cx, cy, w, h, cls, conf = pred
