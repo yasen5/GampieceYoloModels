@@ -111,21 +111,39 @@ def replace_color(img_array, src_rgb, target_rgb, tolerance=30):
     """
     # Convert to float for processing
     result = img_array.astype(float)
-    has_alpha = img_array.shape[2] == 4
     
     # Get HSV values for source and target
     src_h, src_s, src_v = rgb_to_hsv(*src_rgb)
     target_h, target_s, target_v = rgb_to_hsv(*target_rgb)
     
-    # Convert image to HSV
+    # Convert image to HSV - vectorized operation
     rgb_img = result[:, :, :3] / 255.0
-    h = np.zeros(rgb_img.shape[:2])
-    s = np.zeros(rgb_img.shape[:2])
-    v = np.zeros(rgb_img.shape[:2])
     
-    for i in range(rgb_img.shape[0]):
-        for j in range(rgb_img.shape[1]):
-            h[i, j], s[i, j], v[i, j] = colorsys.rgb_to_hsv(*rgb_img[i, j])
+    # Vectorized RGB to HSV conversion
+    r, g, b = rgb_img[:, :, 0], rgb_img[:, :, 1], rgb_img[:, :, 2]
+    maxc = np.maximum(np.maximum(r, g), b)
+    minc = np.minimum(np.minimum(r, g), b)
+    v = maxc
+    
+    deltac = maxc - minc
+    s = np.where(maxc != 0, deltac / maxc, 0)
+    
+    # Calculate hue
+    h = np.zeros_like(maxc)
+    
+    # Red is max
+    mask_r = (maxc == r) & (deltac != 0)
+    h[mask_r] = ((g[mask_r] - b[mask_r]) / deltac[mask_r]) % 6
+    
+    # Green is max
+    mask_g = (maxc == g) & (deltac != 0)
+    h[mask_g] = ((b[mask_g] - r[mask_g]) / deltac[mask_g]) + 2
+    
+    # Blue is max
+    mask_b = (maxc == b) & (deltac != 0)
+    h[mask_b] = ((r[mask_b] - g[mask_b]) / deltac[mask_b]) + 4
+    
+    h = h / 6.0  # Normalize to 0-1
     
     # Create mask for pixels matching source color
     # Match based on hue primarily, with some saturation consideration
@@ -138,8 +156,7 @@ def replace_color(img_array, src_rgb, target_rgb, tolerance=30):
     else:
         mask = (hue_diff < hue_tolerance) & (s > 0.1)
     
-    # For matching pixels, preserve their brightness and saturation relative to source
-    # but change the hue to target
+    # For matching pixels, change hue to target
     if target_s < 0.1:  # Target is grayscale
         s[mask] = 0
         h[mask] = 0
@@ -148,13 +165,55 @@ def replace_color(img_array, src_rgb, target_rgb, tolerance=30):
         # Optionally adjust saturation towards target
         s[mask] = np.clip(s[mask] * (target_s / max(src_s, 0.1)), 0, 1)
     
-    # Convert back to RGB
-    for i in range(rgb_img.shape[0]):
-        for j in range(rgb_img.shape[1]):
-            r, g, b = colorsys.hsv_to_rgb(h[i, j], s[i, j], v[i, j])
-            result[i, j, 0] = r * 255
-            result[i, j, 1] = g * 255
-            result[i, j, 2] = b * 255
+    # Vectorized HSV to RGB conversion
+    h_i = (h * 6.0).astype(int)
+    f = h * 6.0 - h_i
+    p = v * (1.0 - s)
+    q = v * (1.0 - f * s)
+    t = v * (1.0 - (1.0 - f) * s)
+    
+    h_i = h_i % 6
+    
+    # Initialize output arrays
+    r_out = np.zeros_like(v)
+    g_out = np.zeros_like(v)
+    b_out = np.zeros_like(v)
+    
+    # Apply conversions based on hue segment
+    mask0 = (h_i == 0)
+    r_out[mask0] = v[mask0]
+    g_out[mask0] = t[mask0]
+    b_out[mask0] = p[mask0]
+    
+    mask1 = (h_i == 1)
+    r_out[mask1] = q[mask1]
+    g_out[mask1] = v[mask1]
+    b_out[mask1] = p[mask1]
+    
+    mask2 = (h_i == 2)
+    r_out[mask2] = p[mask2]
+    g_out[mask2] = v[mask2]
+    b_out[mask2] = t[mask2]
+    
+    mask3 = (h_i == 3)
+    r_out[mask3] = p[mask3]
+    g_out[mask3] = q[mask3]
+    b_out[mask3] = v[mask3]
+    
+    mask4 = (h_i == 4)
+    r_out[mask4] = t[mask4]
+    g_out[mask4] = p[mask4]
+    b_out[mask4] = v[mask4]
+    
+    mask5 = (h_i == 5)
+    r_out[mask5] = v[mask5]
+    g_out[mask5] = p[mask5]
+    b_out[mask5] = q[mask5]
+    
+    # Update result array
+    result[:, :, 0] = r_out * 255
+    result[:, :, 1] = g_out * 255
+    result[:, :, 2] = b_out * 255
     
     return result.astype(np.uint8)
 
