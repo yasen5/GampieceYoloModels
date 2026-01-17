@@ -3,15 +3,15 @@ import cv2
 import yaml
 import numpy as np
 from pathlib import Path
+import constants
 
 # Config
-YAML_PATH = "/mnt/c/Users/Yasen/Documents/dodgeball_detection_third_attempt/data.yaml"
-MODEL_PATH = "best.onnx"
+YAML_PATH = constants.MODEL_PATH + "data.yaml"
 
 with open(YAML_PATH) as f:
     data = yaml.safe_load(f)
 yaml_dir = Path(YAML_PATH)
-val_path = Path("/mnt/c/Users/Yasen/Documents/dodgeball_detection_third_attempt/valid/images")
+val_path = Path(constants.DATASET + "valid/images")
 img_files = list(val_path.glob('*.jpg')) + list(val_path.glob('*.png'))
 
 print(f"YAML path: {YAML_PATH}")
@@ -23,7 +23,7 @@ if len(img_files) == 0:
     exit(1)
 print()
 
-session = ort.InferenceSession(MODEL_PATH)
+session = ort.InferenceSession(constants.MODEL_PATH)
 input_name = session.get_inputs()[0].name
 input_shape = session.get_inputs()[0].shape
 img_size = input_shape[2]

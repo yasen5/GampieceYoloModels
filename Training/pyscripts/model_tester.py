@@ -4,8 +4,8 @@ import numpy as np
 from pathlib import Path
 
 # Config
-img_dir = Path("datasets/real_gamepieces")
-MODEL_PATH = "/home/yasen/runs/detect/rebuilt/weights/best.onnx"
+img_dir = Path(constants.DATASET)
+MODEL_PATH = constants.MODEL_PATH
 
 img_files = list(img_dir.glob('*.jpg')) + list(img_dir.glob('*.png')) + list(img_dir.glob('*.jpeg'))
 
