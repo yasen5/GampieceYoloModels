@@ -1,6 +1,6 @@
 .*
 !.gitignore
-Training/__pycache__/*
+**/__pycache__/*
 Training/datasets/*
 runs/*
 !runs/detect/
