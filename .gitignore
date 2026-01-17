@@ -8,4 +8,4 @@ runs/*
 !runs/detect/**/weights/
 !runs/detect/**/weights/best.*
 pure_yolo_no_autodistill/*
-yolo_gpu_working/*
+yolo-gpu-working/*
