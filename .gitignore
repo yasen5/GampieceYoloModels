@@ -1,0 +1,11 @@
+.*
+!.gitignore
+Training/__pycache__/*
+Training/datasets/*
+runs/*
+!runs/detect/
+!runs/detect/**/
+!runs/detect/**/weights/
+!runs/detect/**/weights/best.*
+pure_yolo_no_autodistill/*
+yolo_gpu_working/*
