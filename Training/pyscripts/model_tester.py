@@ -8,16 +8,14 @@ from typing import List, Tuple, Optional
 class ONNXDetector:
     """ONNX-based object detection library."""
     
-    def __init__(self, model_path: str, conf_threshold: float = 0.25):
+    def __init__(self, model_path: str):
         """
         Initialize the ONNX detector.
         
         Args:
             model_path: Path to the ONNX model file
-            conf_threshold: Confidence threshold for detections (0.0-1.0)
         """
         self.model_path = model_path
-        self.conf_threshold = conf_threshold
         
         # Load ONNX session
         self.session = ort.InferenceSession(model_path)
@@ -25,7 +23,7 @@ class ONNXDetector:
         input_shape = self.session.get_inputs()[0].shape
         self.img_size = input_shape[2]
     
-    def preprocess_image(self, img_rgb: np.ndarray) -> Tuple[np.ndarray, dict]:
+    def preprocess_image(self, img_rgb: np.ndarray) -> Tuple[np.ndarray, np.ndarray, dict]:
         """
         Preprocess image with letterbox resizing.
         
@@ -67,7 +65,7 @@ class ONNXDetector:
             'orig_w': orig_w
         }
         
-        return img_input, metadata
+        return img_input, img_padded, metadata
     
     def detect(self, img_rgb: np.ndarray) -> List[Tuple[int, int, int, int, float, int]]:
         """
@@ -80,7 +78,7 @@ class ONNXDetector:
             List of detections, each as (x1, y1, x2, y2, confidence, class_id)
         """
         # Preprocess
-        img_input, metadata = self.preprocess_image(img_rgb)
+        img_input, img_padded, metadata = self.preprocess_image(img_rgb)
         
         # Inference
         outputs = self.session.run(None, {self.input_name: img_input})[0]
@@ -111,23 +109,21 @@ class ONNXDetector:
         for det in detections:
             x1, y1, x2, y2, conf, cls = det
             
-            # Filter by confidence threshold
-            if conf > self.conf_threshold:
-                # Convert coordinates back to original image space
-                x1 = (x1 - left) / scale
-                y1 = (y1 - top) / scale
-                x2 = (x2 - left) / scale
-                y2 = (y2 - top) / scale
-                
-                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-                
-                valid_detections.append((x1, y1, x2, y2, float(conf), int(cls)))
+            # Convert coordinates back to original image space
+            x1 = (x1 - left) / scale
+            y1 = (y1 - top) / scale
+            x2 = (x2 - left) / scale
+            y2 = (y2 - top) / scale
+            
+            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+            
+            valid_detections.append((x1, y1, x2, y2, float(conf), int(cls)))
         
         return valid_detections
     
     def draw_detections(self, img_bgr: np.ndarray, detections: List[Tuple], 
                        color: Tuple[int, int, int] = (0, 255, 0), 
-                       thickness: int = 6) -> np.ndarray:
+                        thickness: int = 6):
         """
         Draw bounding boxes on image.
         
@@ -140,16 +136,15 @@ class ONNXDetector:
         Returns:
             Image with drawn detections
         """
-        img_draw = img_bgr.copy()
-        
         for x1, y1, x2, y2, conf, cls in detections:
-            cv2.rectangle(img_draw, (x1, y1), (x2, y2), color, thickness)
+            if (x1 == 0 and x2 == 0):
+                continue;
+            cv2.rectangle(img_bgr, (x1, y1), (x2, y2), color, thickness)
             
             label = f"{conf:.2f}"
-            cv2.putText(img_draw, label, (x1, max(y1-10, 0)),
+            cv2.putText(img_bgr, label, (x1, max(y1-10, 0)),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
         
-        return img_draw
 
 
 def resize_for_display(img: np.ndarray, max_size: int = 640) -> np.ndarray:
@@ -173,7 +168,6 @@ def resize_for_display(img: np.ndarray, max_size: int = 640) -> np.ndarray:
 
 
 def process_directory(img_dir: Path, model_path: str, 
-                     conf_threshold: float = 0.25,
                      display_size: int = 640):
     """
     Process all images in a directory and display detections.
@@ -181,7 +175,6 @@ def process_directory(img_dir: Path, model_path: str,
     Args:
         img_dir: Directory containing images
         model_path: Path to ONNX model
-        conf_threshold: Confidence threshold
         display_size: Display window size
     """
     # Find all image files
@@ -194,7 +187,7 @@ def process_directory(img_dir: Path, model_path: str,
         return
     
     # Initialize detector
-    detector = ONNXDetector(model_path, conf_threshold)
+    detector = ONNXDetector(model_path)
     
     # Process each image
     for img_file in img_files:
@@ -206,10 +199,10 @@ def process_directory(img_dir: Path, model_path: str,
         detections = detector.detect(img_rgb)
         
         # Draw results
-        img_draw = detector.draw_detections(img_bgr, detections)
+        detector.draw_detections(img_bgr, detections)
         
         # Resize for display
-        img_display = resize_for_display(img_draw, display_size)
+        img_display = resize_for_display(img_bgr, display_size)
         
         # Display
         cv2.imshow('Detections', img_display)
