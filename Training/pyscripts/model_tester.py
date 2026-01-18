@@ -123,7 +123,7 @@ class ONNXDetector:
     
     def draw_detections(self, img_bgr: np.ndarray, detections: List[Tuple], 
                        color: Tuple[int, int, int] = (0, 255, 0), 
-                        thickness: int = 6):
+                        thickness: int = 3):
         """
         Draw bounding boxes on image.
         

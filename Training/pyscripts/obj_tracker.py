@@ -27,15 +27,38 @@ class BoundingBox:
 @dataclass
 class Track:
     history: Deque[BoundingBox]
-    missed_frames: int = 0
+    missed_frames: int = 0;
+    x_vel: float = -1;
+    y_vel: float = -1;
+    y_accel: float = -1;
 
     @property
     def last(self) -> BoundingBox:
-        return self.history[-1]
+        return self.history[-1];
 
     @property
     def cls(self) -> int:
-        return self.last.cls
+        return self.last.cls;
+
+    @property
+    def predicted_next_pos(self) -> BoundingBox:
+        if len(self.history) < 3:
+            print("Asking for next pos without enough data")
+        dt = self.missed_frames + 1;
+        y_vel_pred = self.y_vel + self.y_accel * self.missed_frames;
+        return BoundingBox(self.last.x1 + int(self.x_vel * dt), self.last.y1 + int(y_vel_pred * dt), self.last.x2 + int(self.x_vel * dt), self.last.y2 + int(y_vel_pred * dt), self.cls);
+
+    def update_physics(self):
+        if len(self.history) == 1:
+            return;
+        else:
+            prev_vel_weight_x: float = min(0.5, (len(self.history) - 1)/20) #TODO tune
+            prev_vel_weight_y: float = min(0.0, (len(self.history) - 1)/20) #TODO tune
+            old_y_vel = self.y_vel;
+            self.x_vel = prev_vel_weight_x * self.x_vel + (1 - prev_vel_weight_x) * (self.history[-1].center[0] - self.history[-2].center[0]);
+            self.y_vel = prev_vel_weight_y * self.y_vel + (1 - prev_vel_weight_y) * (self.history[-1].center[1] - self.history[-2].center[1]);
+            prev_accel_weight: float = min(0.5, (len(self.history) - 2)/20);
+            self.y_accel = prev_accel_weight * self.y_accel + (1 - prev_accel_weight) * (self.y_vel - old_y_vel);
 
 def compute_iou(a: BoundingBox, b: BoundingBox) -> float:
     x1 = max(a.x1, b.x1)
@@ -61,9 +84,9 @@ def run_tracking():
 
     detector = ONNXDetector(constants.MODEL_PATH)
 
-    cap = cv2.VideoCapture("datasets/videos/480pvid.mp4")
+    cap = cv2.VideoCapture("datasets/videos/480psnipped.mp4")
 
-    object_position_lists: list[Track] = [] 
+    object_position_histories: list[Track] = [] 
 
     counter = 0;
 
@@ -73,17 +96,23 @@ def run_tracking():
         if not ok:
             print("Done")
             break;
-        print(f"Frame {counter}\tObjects: {len(object_position_lists)}")
+        print(f"Frame {counter}\tObjects: {len(object_position_histories)}")
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB);
 
         raw_detections = detector.detect(rgb);
         detections = parse_detections(raw_detections);
 
-        claimed = [False] * len(object_position_lists);
-        num_possible_objects = len(object_position_lists);
+        claimed = [False] * len(object_position_histories);
+        num_possible_objects = len(object_position_histories);
+        
+        for object_pos_history in object_position_histories:
+            if len(object_pos_history.history) < 3:
+                continue;
+            next_pos_pred = object_pos_history.predicted_next_pos;
+            cv2.rectangle(frame, (next_pos_pred.x1, next_pos_pred.y1), (next_pos_pred.x2, next_pos_pred.y2), (0, 0, 255), 4);
 
-        for tracked in object_position_lists:
+        for tracked in object_position_histories:
             tracked.missed_frames += 1;
 
         for box in detections:
@@ -93,29 +122,30 @@ def run_tracking():
             closest_obj_index = -1;
             closest_iou = 0;
             for i in range(num_possible_objects):
-                if claimed[i] or object_position_lists[i].cls != box.cls:
+                if claimed[i] or object_position_histories[i].cls != box.cls:
                     continue;
-                iou = compute_iou(box, object_position_lists[i].last);
+                iou = compute_iou(box, object_position_histories[i].last);
                 if (iou > MIN_IOU and iou > closest_iou):
                     closest_iou = iou;
                     closest_obj_index = i;
             if closest_obj_index != -1:
-                object_position_lists[closest_obj_index].history.append(box);
-                object_position_lists[closest_obj_index].missed_frames = 0;
+                object_position_histories[closest_obj_index].history.append(box);
+                object_position_histories[closest_obj_index].missed_frames = 0;
                 claimed[closest_obj_index] = True;
             else:
-                object_position_lists.append(Track(deque(maxlen=15), 0));
-                object_position_lists[-1].history.append(box);
+                object_position_histories.append(Track(deque(maxlen=15), 0));
+                object_position_histories[-1].history.append(box);
                 claimed.append(True);
         detector.draw_detections(frame, raw_detections);
-        object_position_lists = [x for x in object_position_lists if x.missed_frames <= 3];
-        for object_pos_list in object_position_lists:
-            if len(object_pos_list.history) < 2:
+        object_position_histories = [x for x in object_position_histories if x.missed_frames <= 3];
+        for object_pos_history in object_position_histories:
+            object_pos_history.update_physics();
+            if len(object_pos_history.history) < 2:
                 continue;
-            for i in range(1, len(object_pos_list.history)):
-                new_center = object_pos_list.history[i].center;
-                old_center = object_pos_list.history[i-1].center;
-                cv2.line(frame, old_center, new_center, (0, 255, 0), 16);
+            for i in range(1, len(object_pos_history.history)):
+                new_center = object_pos_history.history[i].center;
+                old_center = object_pos_history.history[i-1].center;
+                cv2.line(frame, old_center, new_center, (0, 255, 0), 4);
         cv2.imshow("Test", frame);
         cv2.waitKey(0);
     cv2.destroyAllWindows(); 
